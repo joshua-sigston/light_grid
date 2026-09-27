@@ -20,6 +20,16 @@ class Bulb(Cell):
         else:
             print(".")
 
+class Wall(Cell):
+    def __init__(self, row, col):
+        super().__init__(row, col)
+
+    def toggle(self):
+        return
+
+    def display(self):
+        return "#"
+
 if __name__ == "__main__":
     c = Cell(1, 2)
     print(c)
@@ -29,3 +39,4 @@ if __name__ == "__main__":
     print(b.display())
     b.toggle()
     print(b.display())
+
