@@ -1,0 +1,291 @@
+# Project 2 — Light Grid
+
+A grid of lights in the terminal. Some squares are bulbs. Some are walls. You type `toggle 2 3` to flip a bulb on or off. Walls cannot be toggled.
+
+This is the same thinking as Minesweeper’s `Cell` / `Board` / `display()` / flag-toggle, without mines or flood fill.
+
+---
+
+## What you are making
+
+```text
+    0  1  2  3  4
+ 0  .  .  #  .  .
+ 1  .  *  .  .  .
+ 2  .  .  .  .  .
+ 3  .  .  .  .  .
+
+> toggle 1 1
+    0  1  2  3  4
+ 0  .  .  #  .  .
+ 1  .  .  .  .  .
+ 2  .  .  .  .  .
+```
+
+| Symbol | Meaning |
+| --- | --- |
+| `.` | Bulb is **off** |
+| `*` | Bulb is **on** |
+| `#` | Wall. Cannot toggle. |
+
+---
+
+## Skills this trains
+
+| Skill | Where it shows up | Later in Minesweeper |
+| --- | --- | --- |
+| Class + `self` | Each square remembers its own on/off | Each cell remembers revealed/flagged |
+| Two independent facts | `is_on` is not the same as “is a wall” | `is_flagged` is not the same as `is_revealed` |
+| Inheritance | `Bulb` and `Wall` both **are** `Cell`s | `SafeCell` and `MineCell` both **are** `Cell`s |
+| `super().__init__` | Child runs the parent setup | Same |
+| Override `display()` | Open bulbs and walls look different | Open safe cells and mines look different |
+| List of lists | `grid[row][col]` | Same |
+| Nested `for` + `range` | Build and print the grid | Same |
+| Row index on the left | Player can name a square | Same |
+| Toggle | Flip `is_on` if allowed | `toggle_flag` |
+
+The boolean lesson from Minesweeper, in a simpler story:
+
+- A **new bulb** starts **off** (`is_on = False`).
+- `toggle()` flips that one switch.
+- `display()` only **reports** the switch. It does not flip it.
+
+---
+
+## Files to create
+
+```text
+02-light-grid/
+├── PROJECT_GUIDE.md
+├── cell.py
+├── board.py
+└── main.py
+```
+
+```bash
+python3 main.py
+```
+
+---
+
+## Step 1 — Welcome and Git
+
+`main.py` prints `Light Grid`. Init Git. Commit.
+
+---
+
+## Step 2 — The parent `Cell`
+
+In `cell.py`:
+
+```python
+class Cell:
+    def __init__(self, row, col):
+        self.row = row
+        self.col = col
+```
+
+**What it is supposed to do:** remember where the square is. Shared by bulbs and walls.
+
+Add `__repr__` so `print(cell)` shows type and position, not a memory address.
+
+Put a test at the bottom:
+
+```python
+if __name__ == "__main__":
+    c = Cell(1, 2)
+    print(c)
+```
+
+**Checkpoint:** `python3 cell.py` prints something like `Cell(1, 2)`. Commit.
+
+---
+
+## Step 3 — `Bulb(Cell)`: one switch
+
+**The idea:** a bulb has one extra fact: on or off. That fact is **not** the same as “has this object been created?” Default `False` means off.
+
+**What `__init__` is supposed to do:** run the parent setup, then start off.
+
+```python
+class Bulb(Cell):
+    def __init__(self, row, col):
+        super().__init__(row, col)
+        self.is_on = False
+```
+
+If you skip `super()`, the bulb has no `row` or `col`.
+
+**What `toggle(self)` is supposed to do:** flip `is_on`. No printing.
+
+```python
+self.is_on = not self.is_on
+```
+
+**What `display(self)` is supposed to do:** **return** one character.
+
+- if `is_on` is `True` → `"*"`
+- if `is_on` is `False` → `"."`
+
+`display` does not change `is_on`. It only looks at it.
+
+**Checkpoint:**
+
+```python
+if __name__ == "__main__":
+    b = Bulb(0, 0)
+    print(b.display())    # .
+    b.toggle()
+    print(b.display())    # *
+    b.toggle()
+    print(b.display())    # .
+```
+
+Commit.
+
+---
+
+## Step 4 — `Wall(Cell)`: cannot toggle
+
+**What it is supposed to do:** look like `#` forever. `toggle()` does nothing.
+
+```python
+class Wall(Cell):
+    def __init__(self, row, col):
+        super().__init__(row, col)
+
+    def toggle(self):
+        return    # ignore
+
+    def display(self):
+        return "#"
+```
+
+The board will later call `cell.toggle()` on whatever is at that square. A wall object already knows to ignore it. That is why inheritance is useful: the board does not need `if wall: ... elif bulb: ...` for every click.
+
+**Checkpoint:** create a wall, call `toggle()`, `display()` is still `"#"`. Commit.
+
+---
+
+## Step 5 — `Board`: a list of lists
+
+**The idea:**
+
+```text
+grid[0] = [cell, cell, cell, ...]
+grid[1] = [cell, cell, cell, ...]
+```
+
+The square at row `r`, column `c` is `self.grid[r][c]`.
+
+**What `__init__(self, rows, cols)` is supposed to do:** store the sizes and build the grid.
+
+**What `create_grid` is supposed to do:** every square starts as a **new** `Bulb`. Do not reuse one object in every slot.
+
+Use two names so you do not overwrite the row index:
+
+```python
+for r in range(self.rows):
+    row = []
+    for c in range(self.cols):
+        row.append(Bulb(r, c))
+    grid.append(row)
+```
+
+If you write `for row in range(...)` and then `row = []`, the number is gone and `Bulb(row, c)` gets a list instead of an index.
+
+**What `place_walls` is supposed to do:** replace a few bulbs with `Wall` objects. Hard-code 3 positions for now, for example `(0, 2)`, `(2, 2)`, `(4, 1)`. Random walls can wait.
+
+```python
+self.grid[r][c] = Wall(r, c)
+```
+
+**What `print_board` is supposed to do:**
+
+1. Print a blank pad, then column numbers `0 1 2 ...`
+2. For each row index `r`, print `r` first, then each `cell.display()`.
+
+You need the index. Use:
+
+```python
+for r in range(self.rows):
+    print(r, end=" ")
+    for c in range(self.cols):
+        print(self.grid[r][c].display(), end=" ")
+    print()
+```
+
+Do not print inside `__init__`. Setup stores data. `print_board` draws.
+
+**Checkpoint:** `python3 board.py` shows a 5x5 of dots with `#` on the wall squares, and numbers on the top and left. Commit.
+
+---
+
+## Step 6 — `Board.toggle(row, col)`
+
+**What it is supposed to do:** find that square and ask it to toggle.
+
+| Situation | What to do |
+| --- | --- |
+| Off the board | Do not index the grid. Print that those numbers are illegal. |
+| On the board | `self.grid[row][col].toggle()` |
+
+Bounds check **before** `self.grid[row][col]`:
+
+```python
+def in_bounds(self, row, col):
+    return 0 <= row < self.rows and 0 <= col < self.cols
+```
+
+After toggle, `print_board()` again so you see the change.
+
+**Checkpoint:** toggle a bulb, it becomes `*`. Toggle it again, `.`. Toggle a wall, it stays `#`. Toggle `99, 99`, no crash. Commit.
+
+---
+
+## Step 7 — Typed commands
+
+In `main.py` (or a small `game.py`):
+
+```text
+while True:
+    print the board
+    read a line
+    strip, lower, split
+    if quit: break
+    if the line is toggle row col:
+        convert the two pieces to int (check .isdigit() first)
+        board.toggle(row, col)
+    else:
+        print how to type a command
+```
+
+Same parser rules as the cafe: check `len(parts)` before `parts[1]`.
+
+**Checkpoint:** you can play from the keyboard. `toggle 1 1` flips a light. Garbage input does not crash. Commit.
+
+---
+
+## Testing checklist
+
+- [ ] New `Bulb` displays `.` without anyone calling `toggle`
+- [ ] `toggle` twice returns to `.`
+- [ ] `Wall.toggle` does not change `#`
+- [ ] Row numbers are the row index, not a leftover list
+- [ ] `toggle 0 0` changes only that square
+- [ ] Off-board coordinates print a message
+
+---
+
+## Thinking pattern to keep
+
+> **Store the truth on the object. Print a view of that truth.**  
+> `is_on` is the truth. `"*"` is only how it looks right now.
+
+> **Create attributes in `__init__`.** If `display()` reads `self.is_on`, `__init__` must have set `self.is_on = False` first. Setting it later in `toggle()` is too late for the first print.
+
+When you go back to Minesweeper:
+
+- `is_on` is like `is_revealed` or `is_flagged` (one fact per switch)
+- `Bulb` / `Wall` is like `SafeCell` / `MineCell`
+- `Board.toggle` is like `Board.flag` / `Board.reveal`
